@@ -12,7 +12,7 @@
 //ImageProcessUtils *ImageProcessUtil;
 
 @implementation ViewController
-cv::Mat org,dst,img,tmp;
+cv::Mat org,dst,img,tmp,tempimg;
 
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -108,16 +108,21 @@ void on_mouse(int event,int x,int y,int flags,void *ustc)//event鼠标事件代�
             return;
         }
         dst = img(cv::Rect(min(cur_pt.x,pre_pt.x),min(cur_pt.y,pre_pt.y),width,height));
-        NSInteger cnt = coordinate(dst,dst);
+        NSInteger cnt = coordinate(dst,dst,min(cur_pt.x,pre_pt.x),min(cur_pt.y,pre_pt.y));
+//        cv::Rect roi_rect = cv::Rect(min(cur_pt.x,pre_pt.x),min(cur_pt.y,pre_pt.y),width,height);
+        
+//        img.copyTo(dst);
+//        dst.copyTo(img(cv::Rect(min(cur_pt.x,pre_pt.x),min(cur_pt.y,pre_pt.y),width,height)));
+        tempimg.copyTo(img(cv::Rect(min(cur_pt.x,pre_pt.x),min(cur_pt.y,pre_pt.y),width,height)));
 //        addWeighted(dst, 1.0, dst, 0.7, 0, dst);
         for(int i=0; i<cnt; i++)
             printf("(%d,%d)",a[0][i], a[1][i]);
         printf("start position is (%d,%d)",pre_pt.x, pre_pt.y);
         printf("end position is (%d,%d)",cur_pt.x, cur_pt.y);
 
-        destroyWindow("dst");
-        namedWindow("dst",WINDOW_NORMAL);
-        imshow("dst",dst);
+//        destroyWindow("dst");
+//        namedWindow("dst",WINDOW_NORMAL);
+//        imshow("dst",dst);
 //        imshow("img",img);
 //        waitKey(0);
         while(1){ if(waitKey(1000)==27)break; }
@@ -141,7 +146,7 @@ vector<cv::Point2d>::iterator  itrc;    //质心坐标迭代器
 vector<vector<cv::Point> > con;    //当前轮廓
 int a[2][20];
 
-int coordinate(Mat &image,Mat &OutImage)
+int coordinate(Mat &image,Mat &OutImage,int x,int y)
 {
     double area;
     double minarea = 10;
@@ -152,10 +157,16 @@ int coordinate(Mat &image,Mat &OutImage)
     //    namedWindow("connected_region");
     //
     //   image = imread("/Users/mac/Documents/Xcode/AB/Train_Image_00.bmp");
+
     cvtColor(image, gray, COLOR_BGR2GRAY);
     blur(gray, edge, cv::Size(3,3));   //模糊去噪
     threshold(edge,edge,200,255,THRESH_BINARY);   //二值化处理
-    
+    tempimg = image;
+    IplImage pBinary = IplImage(tempimg);
+    //深拷贝只要再加一次复制数据：
+    IplImage *input = cvCloneImage(&pBinary);
+    cvSmooth(input,input,CV_GAUSSIAN,3,3);//smooth 
+    tempimg = cvarrToMat(input);
     /*寻找轮廓*/
     findContours( edge, contours,
                  CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE );
@@ -186,7 +197,8 @@ int coordinate(Mat &image,Mat &OutImage)
     {
         area = contourArea(*itr);
         con.push_back(*itr);
-        drawContours(dst,con,-1,Scalar(255,0,0),2);
+        drawContours(dst,con,-1,Scalar(0,0,255),1.5);
+        drawContours(tempimg,con,-1,Scalar(0,0,255),1.5);
         con.pop_back();
         
         //计算质心
@@ -200,7 +212,7 @@ int coordinate(Mat &image,Mat &OutImage)
         a[1][i]=center.y;
         i=i+1;
     }
-//    imshow("origin",image);
+//    imshow("origin",tempimg);
 //    imshow("connected_region",dst);
     OutImage = dst;
     return i;
@@ -266,21 +278,21 @@ void salt(Mat &image,int n){
 }
 -(IBAction)btn_CoordinatImage:(id)sender{
 
-        Mat image;
-//        image = imread("/Users/gdlocal/Desktop/101.jpg");// 测试图片路径
-    if(_imagePath){
-        image = imread([_imagePath UTF8String]);// 测
-//        salt(image, 3000);
-        NSInteger cnt;
-        Mat outimage;
-//        NSImage *image1 = [NSImage imageNamed:@"test.jpg"];
-//        outimage = [image1 CVMat];
-        cnt =coordinate(image,outimage);
-        for(int i=0; i<cnt; i++)
-            printf("(%d,%d)",a[0][i], a[1][i]);
-        
-        [_imageOutput setImage:[NSImage imageWithCVMat:outimage]];
-    }
+//        Mat image;
+////        image = imread("/Users/gdlocal/Desktop/101.jpg");// 测试图片路径
+//    if(_imagePath){
+//        image = imread([_imagePath UTF8String]);// 测
+////        salt(image, 3000);
+//        NSInteger cnt;
+//        Mat outimage;
+////        NSImage *image1 = [NSImage imageNamed:@"test.jpg"];
+////        outimage = [image1 CVMat];
+//        cnt =coordinate(image,outimage);
+//        for(int i=0; i<cnt; i++)
+//            printf("(%d,%d)",a[0][i], a[1][i]);
+//        
+//        [_imageOutput setImage:[NSImage imageWithCVMat:outimage]];
+//    }
 }
 -(IBAction)btn_ReduceImage:(id)sender{
     Mat image;
@@ -298,8 +310,8 @@ void salt(Mat &image,int n){
     if(_imagePath){
         org = imread([_imagePath UTF8String]);
         cv::Size outsize;
-        outsize.width = org.cols*0.35;
-        outsize.height = org.rows*0.35;
+        outsize.width = org.cols*0.45;
+        outsize.height = org.rows*0.45;
         resize(org,org,outsize,0,0,INTER_AREA);
 
         org.copyTo(img);
